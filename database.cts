@@ -16,7 +16,7 @@ export function initializeDatabase(userDataPath: string): DB {
     return db;
 }
 
-export function setupDatabase(db: DB) {
+export function setupDatabase(db: DB): void {
   // Drop old tables in the correct order to respect foreign key constraints
   db.exec('DROP TABLE IF EXISTS detections');
   db.exec('DROP TABLE IF EXISTS persons');
@@ -56,7 +56,7 @@ export function setupDatabase(db: DB) {
   console.log('Database setup with new schema complete.');
 }
 
-export default function getDb() {
+export default function getDb(): DB {
   if (!db) throw new Error('Database not initialized.');
   return db;
 } 

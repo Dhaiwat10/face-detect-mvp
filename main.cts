@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 import * as canvas from 'canvas';
 import * as faceapi from '@vladmandic/face-api';
-import getDb, { initializeDatabase, setupDatabase } from './database';
+import getDb, { initializeDatabase, setupDatabase } from './database.cjs';
 
 // --- ELECTRON APP SETUP ---
 let mainWindow: BrowserWindow | null;
@@ -18,16 +19,23 @@ function createWindow() {
     width: 1600,
     height: 1200,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
     },
   });
 
-  const htmlPath = isDev ? path.join(__dirname, '../indexed_faces.html') : path.join(__dirname, 'indexed_faces.html');
-  mainWindow.loadFile(htmlPath);
-  if (isDev) mainWindow.webContents.openDevTools();
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173'); // Vite dev server
+    mainWindow.webContents.openDevTools();
+  } else {
+    // In production, load the compiled index.html
+    const htmlPath = path.join(__dirname, '../index.html');
+    mainWindow.loadFile(htmlPath);
+  }
 }
+
+app.disableHardwareAcceleration(); // To fix rasterization errors on some systems
 
 app.whenReady().then(async () => {
   const userDataPath = app.getPath('userData');
@@ -143,34 +151,53 @@ ipcMain.handle('query-by-image', async () => {
 
   const img = await canvas.loadImage(queryImagePath);
   const detectionOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
-  const result = await faceapi.detectSingleFace(img as any, detectionOptions)?.withFaceLandmarks().withFaceDescriptor();
+  const results = await faceapi.detectAllFaces(img as any, detectionOptions).withFaceLandmarks().withFaceDescriptors();
 
-  if (!result) {
-    mainWindow.webContents.send('update-results', 'No face could be detected in the query image.');
+  if (!results.length) {
+    mainWindow.webContents.send('update-results', 'No faces could be detected in the query image.');
     return;
   }
+  
+  let resultsHtml = '';
+  const foundPersons = new Map<number, { path: string }[]>();
 
-  const bestMatch = faceMatcher.findBestMatch(result.descriptor);
-  if (bestMatch.label === 'unknown' || bestMatch.distance > 0.55) {
-      mainWindow.webContents.send('update-results', `<h3>No known person found.</h3>`);
-      return;
+  for (const result of results) {
+    const bestMatch = faceMatcher.findBestMatch(result.descriptor);
+    if (bestMatch.label === 'unknown' || bestMatch.distance > 0.55) {
+      continue; // Skip unknown faces
+    }
+    
+    const personId = parseInt(bestMatch.label);
+    if (foundPersons.has(personId)) {
+        continue; // Already processed this person
+    }
+
+    const matchedDetections = db.prepare(`
+      SELECT i.path
+      FROM detections d
+      JOIN images i ON d.image_id = i.id
+      WHERE d.person_id = ?
+    `).all(personId) as { path: string }[];
+    foundPersons.set(personId, matchedDetections);
+  }
+
+  if (foundPersons.size === 0) {
+    resultsHtml = `<h3>No known persons found in the query image.</h3>`;
+  } else {
+    for (const [personId, detections] of foundPersons.entries()) {
+      resultsHtml += `
+        <div class="person-gallery">
+          <h2 class="person-header">Found Person ID: ${personId}</h2>
+          <p>This person also appears in the following images:</p>
+          <div class="detections-container">`;
+      for (const det of detections) {
+          const dataUrl = await fs.promises.readFile(det.path, 'base64');
+          resultsHtml += `<div class="detection"><img src="data:image/jpeg;base64,${dataUrl}" alt="Match in ${det.path}" /><p>${path.basename(det.path)}</p></div>`;
+      }
+      resultsHtml += `</div></div>`;
+    }
   }
   
-  const personId = parseInt(bestMatch.label);
-  const matchedDetections = db.prepare(`
-    SELECT i.path
-    FROM detections d
-    JOIN images i ON d.image_id = i.id
-    WHERE d.person_id = ?
-  `).all(personId) as { path: string }[];
-  
-  let resultsHtml = `<h3>Found Person ID: ${personId} in the following images:</h3><div class="detections-container">`;
-  for (const det of matchedDetections) {
-      // Security Note: In a real app, sanitize paths. Here we trust the DB content.
-      const dataUrl = await fs.promises.readFile(det.path, 'base64');
-      resultsHtml += `<div class="detection"><img src="data:image/jpeg;base64,${dataUrl}" alt="Match in ${det.path}" /><p>${path.basename(det.path)}</p></div>`;
-  }
-  resultsHtml += '</div>';
   // --- End of ported querying logic ---
 
   mainWindow.webContents.send('update-results', resultsHtml);

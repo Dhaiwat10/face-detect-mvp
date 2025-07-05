@@ -37,9 +37,9 @@ To run the application directly from the source code in a development environmen
     ```
 
 2.  **Install dependencies:** This command will also automatically rebuild the native modules required by Electron.
-    ```bash
+```bash
     pnpm install
-    ```
+```
 
 3.  **Start the application:**
     ```bash
@@ -57,8 +57,8 @@ You can package the application into a distributable installer for macOS or Wind
   ```
 
 - **To build for Windows:**
-  ```bash
+```bash
   pnpm dist:win
-  ```
+```
 
 Once built, you can share the resulting `.dmg` (Mac) or `.exe` (Windows) file with other users.
