@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "dist"
+  },
+  "include": ["preload.ts"]
+} 

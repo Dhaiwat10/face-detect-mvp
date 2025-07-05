@@ -4,11 +4,14 @@ import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 import * as canvas from 'canvas';
 import * as faceapi from '@vladmandic/face-api';
-import getDb, { initializeDatabase, setupDatabase } from './database.cjs';
+import getDb, { initializeDatabase, setupDatabase } from './database.js';
 
 // --- ELECTRON APP SETUP ---
 let mainWindow: BrowserWindow | null;
 const isDev = !app.isPackaged;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Monkey patch the environment
 const { Canvas, Image, ImageData } = canvas as any;
@@ -19,7 +22,7 @@ function createWindow() {
     width: 1600,
     height: 1200,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
