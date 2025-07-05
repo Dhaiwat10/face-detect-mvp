@@ -1,18 +1,28 @@
 {
   "name": "face-detect-mvp",
-  "type": "module",
+  "version": "1.0.0",
+  "description": "A desktop app to index and recognize faces from images.",
+  "author": "Your Name",
+  "main": "dist/main.js",
   "scripts": {
-    "index": "tsx index.ts",
-    "query": "tsx query.ts",
-    "server": "tsx server.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
+    "clean": "rimraf dist",
+    "build": "pnpm clean && tsc",
+    "start": "pnpm build && electron .",
+    "desktop": "electron .",
+    "postinstall": "electron-builder install-app-deps",
+    "pack": "pnpm build && electron-builder --dir",
+    "dist:mac": "pnpm build && electron-builder --mac",
+    "dist:win": "pnpm build && electron-builder --win"
   },
+  "keywords": [],
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.0.0",
+    "electron": "^31.2.1",
+    "electron-builder": "^26.0.12",
+    "rimraf": "^6.0.1",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
@@ -23,5 +33,24 @@
     "canvas": "^3.1.2",
     "express": "^4.19.2",
     "multer": "^1.4.5-lts.1"
+  },
+  "build": {
+    "appId": "com.example.facedetectmvp",
+    "productName": "Face Recognition MVP",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "models/**/*",
+      "indexed_faces.html"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
   }
 }

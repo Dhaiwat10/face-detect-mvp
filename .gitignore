@@ -173,3 +173,13 @@ dist
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Build output
+/dist
+/release
+
+# Dependencies
+/node_modules
+
+# Data
+*.db

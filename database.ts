@@ -1,8 +1,22 @@
 import Database from 'better-sqlite3';
+import type { Database as DB } from 'better-sqlite3';
+import * as path from 'path';
+import * as fs from 'fs';
 
-const db = new Database('faces.db');
+let db: DB;
 
-export function setupDatabase() {
+export function initializeDatabase(userDataPath: string): DB {
+    const dbDir = path.join(userDataPath, 'data');
+    if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+    }
+    const dbPath = path.join(dbDir, 'faces.db');
+    console.log(`Database path: ${dbPath}`);
+    db = new Database(dbPath);
+    return db;
+}
+
+export function setupDatabase(db: DB) {
   // Drop old tables in the correct order to respect foreign key constraints
   db.exec('DROP TABLE IF EXISTS detections');
   db.exec('DROP TABLE IF EXISTS persons');
@@ -42,4 +56,7 @@ export function setupDatabase() {
   console.log('Database setup with new schema complete.');
 }
 
-export default db; 
+export default function getDb() {
+  if (!db) throw new Error('Database not initialized.');
+  return db;
+} 
