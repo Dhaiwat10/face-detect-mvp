@@ -2,11 +2,13 @@
   "name": "face-detect-mvp",
   "type": "module",
   "scripts": {
-    "dev": "tsx index.ts",
+    "index": "tsx index.ts",
+    "query": "tsx query.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
@@ -14,6 +16,7 @@
   "dependencies": {
     "@tensorflow/tfjs-node": "^4.22.0",
     "@vladmandic/face-api": "^1.7.13",
+    "better-sqlite3": "^11.1.2",
     "canvas": "^3.1.2"
   }
 }
