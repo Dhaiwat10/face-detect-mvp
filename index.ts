@@ -113,18 +113,31 @@ async function generateHtmlReport() {
     <!DOCTYPE html>
     <html lang="en">
     <head>
-      <meta charset="UTF-8"><title>Indexed Faces</title>
+      <meta charset="UTF-8"><title>Face Recognition</title>
       <style>
         body { font-family: sans-serif; background-color: #1a1a1a; color: #f0f0f0; margin: 0; padding: 20px; }
-        h1 { text-align: center; }
-        .person-gallery { margin-bottom: 40px; padding: 20px; border: 2px solid #555; border-radius: 10px; background-color: #2b2b2b; }
-        .person-header { font-size: 1.5em; margin-bottom: 20px; }
-        .detections-container { display: flex; flex-wrap: wrap; gap: 15px; }
+        h1, h2 { text-align: center; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { margin-bottom: 40px; padding: 20px; border: 2px solid #555; border-radius: 10px; background-color: #2b2b2b; }
+        .detections-container { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
         .detection { text-align: center; }
-        img { display: block; border: 2px solid #444; border-radius: 4px; }
+        img { display: block; border: 2px solid #444; border-radius: 4px; width: 150px; height: 150px; object-fit: contain; }
+        form { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        #query-results { margin-top: 20px; text-align: center; }
       </style>
     </head>
-    <body><h1>Indexed Persons</h1>`;
+    <body>
+      <div class="container">
+        <div id="query-section" class="section">
+          <h2>Query by Image</h2>
+          <form id="query-form">
+            <input type="file" id="query-image" accept="image/*" required>
+            <button type="submit">Find Matches</button>
+          </form>
+          <div id="query-results"></div>
+        </div>
+        <div class="section">
+          <h2>Indexed Persons</h2>`;
   
   for (const personId in groupedByPerson) {
     htmlContent += `
@@ -134,15 +147,82 @@ async function generateHtmlReport() {
     
     for (const det of groupedByPerson[personId]) {
       const img = await canvas.loadImage(det.path);
-      const faceCanvas = canvas.createCanvas(det.box_width, det.box_height);
-      faceCanvas.getContext('2d').drawImage(img, det.box_x, det.box_y, det.box_width, det.box_height, 0, 0, det.box_width, det.box_height);
+      // Create a standard-size canvas
+      const faceCanvas = canvas.createCanvas(150, 150);
+      const faceCtx = faceCanvas.getContext('2d');
+      // Fill background for letterboxing
+      faceCtx.fillStyle = '#222';
+      faceCtx.fillRect(0, 0, 150, 150);
+      
+      // Calculate new dimensions to fit 150x150 while maintaining aspect ratio
+      const aspectRatio = det.box_width / det.box_height;
+      let newWidth = 150, newHeight = 150;
+      if (aspectRatio > 1) { // Wider than tall
+        newHeight = 150 / aspectRatio;
+      } else { // Taller than wide
+        newWidth = 150 * aspectRatio;
+      }
+      const xOffset = (150 - newWidth) / 2;
+      const yOffset = (150 - newHeight) / 2;
+
+      faceCtx.drawImage(img, det.box_x, det.box_y, det.box_width, det.box_height, xOffset, yOffset, newWidth, newHeight);
       const dataUrl = faceCanvas.toDataURL('image/jpeg');
       htmlContent += `<div class="detection"><img src="${dataUrl}" alt="Detection from ${det.path}" /></div>`;
     }
     htmlContent += `</div></div>`;
   }
 
-  htmlContent += `</body></html>`;
+  htmlContent += `
+        </div>
+      </div>
+      <script>
+        const queryForm = document.getElementById('query-form');
+        const queryImageInput = document.getElementById('query-image');
+        const queryResults = document.getElementById('query-results');
+
+        queryForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          if (!queryImageInput.files || queryImageInput.files.length === 0) {
+            queryResults.innerHTML = 'Please select an image file first.';
+            return;
+          }
+          queryResults.innerHTML = 'Processing...';
+
+          const formData = new FormData();
+          formData.append('queryImage', queryImageInput.files[0]);
+
+          try {
+            const res = await fetch('/upload', {
+              method: 'POST',
+              body: formData,
+            });
+            const data = await res.json();
+            displayResults(data);
+          } catch (error) {
+            console.error('Error during fetch:', error);
+            queryResults.innerHTML = 'An error occurred. See console for details.';
+          }
+        });
+        
+        async function displayResults(data) {
+          queryResults.innerHTML = \`<h3>\${data.message}</h3>\`;
+          if (!data.matches || data.matches.length === 0) return;
+
+          const container = document.createElement('div');
+          container.className = 'detections-container';
+          queryResults.appendChild(container);
+          
+          for (const match of data.matches) {
+            // Since we don't have access to the original full images on the client,
+            // we will just show the path for now. A more advanced solution would
+            // be to serve the cropped images from the server.
+            const p = document.createElement('p');
+            p.textContent = \`Found in: \${match.path}\`;
+            container.appendChild(p);
+          }
+        }
+      </script>
+    </body></html>`;
   fs.writeFileSync('indexed_faces.html', htmlContent);
   console.log('HTML report generated: indexed_faces.html');
 }
